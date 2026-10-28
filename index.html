@@ -87,15 +87,24 @@ header h1{font-size:18px;font-weight:600}
 .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:12px 20px;border-radius:24px;font-size:13px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%;text-align:center}
 .toast.show{opacity:1}
 
-/* EXPORT minimale */
+/* ============ EXPORT CALENDARIO ============ */
 #export-container{position:absolute;top:0;left:0;width:100%;pointer-events:none;z-index:-1;opacity:0.01}
-#export-area{width:595px;margin:0 auto;background:#fff;color:#1a1a1a;padding:48px 44px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-.exp-title{font-size:28px;font-weight:700;letter-spacing:-0.5px;margin-bottom:28px;padding-bottom:16px;border-bottom:2px solid #1a1a1a}
-.exp-month{font-size:17px;font-weight:700;text-transform:capitalize;margin:26px 0 12px}
-.exp-row{display:flex;align-items:baseline;gap:12px;padding:11px 2px;border-bottom:1px solid #ececec;font-size:15px}
-.exp-row .who{font-weight:600;min-width:150px}
-.exp-row .when{color:#333}
-.exp-empty{font-size:13px;color:#999;padding:12px 2px;font-style:italic}
+#export-area{width:595px;margin:0 auto;background:#fff;color:#1a1a1a;padding:40px 36px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.exp-title{font-size:28px;font-weight:700;letter-spacing:-0.5px;margin-bottom:6px}
+.exp-sub{font-size:12px;color:#999;margin-bottom:24px;padding-bottom:14px;border-bottom:2px solid #1a1a1a}
+.exp-month-block{break-inside:avoid;page-break-inside:avoid;margin-bottom:26px}
+.exp-month{font-size:17px;font-weight:700;text-transform:capitalize;margin-bottom:10px}
+.exp-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.exp-cal .h{text-align:center;font-size:9px;font-weight:700;padding:6px 0;color:#999;text-transform:uppercase}
+.exp-cal .c{min-height:58px;border:1px solid #e8e8e8;border-radius:6px;padding:5px;font-size:9px;position:relative;overflow:hidden}
+.exp-cal .c .n{font-weight:700;font-size:12px;line-height:1}
+.exp-cal .c .fl{font-size:7px;color:#b08a3e;margin-top:2px;line-height:1.1}
+.exp-cal .c.festive{background:#FFF7E6}
+.exp-cal .c.has{background:#f5f5f5;border:1.5px solid #1a1a1a}
+.exp-cal .c .ops{margin-top:4px;display:flex;flex-direction:column;gap:2px}
+.exp-cal .c .ops .op{display:block;font-size:8.5px;font-weight:600;padding-left:4px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exp-cal .c.empty{opacity:0;border:none}
+.exp-empty{font-size:14px;color:#999;padding:20px 2px;font-style:italic}
 </style>
 </head>
 <body>
@@ -208,12 +217,6 @@ header h1{font-size:18px;font-weight:600}
     <div class="modal-body">
       <div class="form-group"><label>Nome attività</label><input type="text" id="companyName"></div>
       <div class="form-group"><label>Anno di riferimento per i giorni rimanenti</label><input type="number" id="refYear"></div>
-      <div class="form-group"><label>Scope dell'export</label>
-        <select id="exportScope">
-          <option value="month">Solo il mese selezionato</option>
-          <option value="year">Tutto l'anno (12 mesi)</option>
-        </select>
-      </div>
       <button class="btn btn-primary" style="width:100%" onclick="saveSettings()">Salva</button>
       <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
       <button class="btn btn-secondary" style="width:100%;background:#f5c0c0;color:#8b0000" onclick="resetLeaves()">Elimina tutte le assenze</button>
@@ -230,7 +233,7 @@ const SUPABASE_KEY='sb_publishable_KV0Avg1vu9F1Q-FuHQ3aRQ_jJs9h0Np';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let operators=[],leaves=[];
-let settings={company:'Gestione Ferie',refYear:new Date().getFullYear(),exportScope:'month'};
+let settings={company:'Gestione Ferie',refYear:new Date().getFullYear()};
 let currentYear=new Date().getFullYear(),currentMonth=new Date().getMonth();
 let activeFilter=null,selectedDay=null;
 
@@ -274,7 +277,6 @@ async function loadSettings(){
   document.getElementById('companyDisplay').textContent=settings.company;
   document.getElementById('companyName').value=settings.company;
   document.getElementById('refYear').value=settings.refYear;
-  document.getElementById('exportScope').value=settings.exportScope||'month';
 }
 const DEFAULTS=[
   {name:'Martorana',color:'#F5D5C0',total_days:26,used_days:0,is_active:true},
@@ -476,12 +478,10 @@ function editCompany(){openModal('settingsModal')}
 async function saveSettings(){
   settings.company=document.getElementById('companyName').value||'Gestione Ferie';
   settings.refYear=parseInt(document.getElementById('refYear').value)||new Date().getFullYear();
-  settings.exportScope=document.getElementById('exportScope').value;
   try{
     await sb.from('settings').upsert([
       {key:'company',value:settings.company},
-      {key:'refYear',value:String(settings.refYear)},
-      {key:'exportScope',value:settings.exportScope}
+      {key:'refYear',value:String(settings.refYear)}
     ]);
   }catch(e){localStorage.setItem('settings',JSON.stringify(settings))}
   document.getElementById('companyDisplay').textContent=settings.company;
@@ -493,29 +493,64 @@ async function resetLeaves(){
   leaves=[];localStorage.setItem('leaves','[]');closeModal('settingsModal');render();showToast('✓ Assenze eliminate');
 }
 
-/* ============ EXPORT: date formato "9 Novembre 2026" ============ */
-function buildExportContent(){
-  const scope=settings.exportScope||'month';
-  const months=scope==='year'?[0,1,2,3,4,5,6,7,8,9,10,11]:[currentMonth];
-  let html=`<div class="exp-title">Proposta permessi</div>`;
+/* ============ EXPORT: calendario mesi futuri con assenze ============ */
+function leavesOnDateAll(dateStr){
+  const d=parse(dateStr);
+  return leaves.filter(l=>d>=parse(l.start_date)&&d<=parse(l.end_date));
+}
 
-  months.forEach(m=>{
-    const daysIn=new Date(currentYear,m+1,0).getDate();
-    html+=`<div class="exp-month">${MONTHS[m]} ${currentYear}</div>`;
-    let rows='';
-    operators.forEach(op=>{
-      const days=[];
-      for(let d=1;d<=daysIn;d++){
-        const ds=fmt(new Date(currentYear,m,d));
-        const hit=leaves.some(l=>l.operator_id===op.id && parse(ds)>=parse(l.start_date) && parse(ds)<=parse(l.end_date));
-        if(hit)days.push(`${d} ${MONTHS[m]} ${currentYear}`);
-      }
-      if(days.length){
-        rows+=`<div class="exp-row"><span class="who">${esc(op.name)}</span><span class="when">— ${days.join(', ')}</span></div>`;
-      }
+function renderMonthForExport(year,month){
+  const today=new Date();today.setHours(0,0,0,0);
+  const first=new Date(year,month,1),last=new Date(year,month+1,0);
+  let off=first.getDay();off=off===0?6:off-1;
+  const hs=holidays(year);
+  let html=`<div class="exp-month-block"><div class="exp-month">${MONTHS[month]} ${year}</div><div class="exp-cal">`;
+  DAYS.forEach(d=>{html+=`<div class="h">${d}</div>`});
+  for(let i=off;i>0;i--)html+='<div class="c empty"></div>';
+  for(let d=1;d<=last.getDate();d++){
+    const date=new Date(year,month,d);
+    const ds=fmt(date);
+    const isPast=date<today;
+    const h=hs.find(x=>x.date===ds);
+    const dayLeaves=isPast?[]:leavesOnDateAll(ds);
+    let cls='c';
+    if(h)cls+=' festive';
+    if(dayLeaves.length)cls+=' has';
+    let ops='';
+    dayLeaves.forEach(l=>{
+      const op=operators.find(o=>o.id===l.operator_id);
+      if(op)ops+=`<span class="op" style="border-left:3px solid ${op.color}">${esc(op.name)}</span>`;
     });
-    html+=rows||'<div class="exp-empty">Nessuna assenza</div>';
+    html+=`<div class="${cls}"><div class="n">${d}</div>${h?`<div class="fl">${h.name}</div>`:''}${ops?`<div class="ops">${ops}</div>`:''}</div>`;
+  }
+  const total=off+last.getDate();
+  const rem=(7-(total%7))%7;
+  for(let i=0;i<rem;i++)html+='<div class="c empty"></div>';
+  html+='</div></div>';
+  return html;
+}
+
+function buildExportContent(){
+  const today=new Date();today.setHours(0,0,0,0);
+  const monthSet=new Map();
+  leaves.forEach(l=>{
+    let d=parse(l.start_date);const end=parse(l.end_date);
+    while(d<=end){
+      if(d>=today){
+        const key=d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0');
+        if(!monthSet.has(key))monthSet.set(key,{year:d.getFullYear(),month:d.getMonth()});
+      }
+      d.setDate(d.getDate()+1);
+    }
   });
+  const months=[...monthSet.values()].sort((a,b)=>a.year-b.year||a.month-b.month);
+  let html=`<div class="exp-title">Proposta permessi</div>
+    <div class="exp-sub">Calendario dei mesi futuri con assenze programmate</div>`;
+  if(!months.length){
+    html+='<div class="exp-empty">Nessuna assenza programmata nei mesi futuri.</div>';
+    return html;
+  }
+  months.forEach(({year,month})=>{html+=renderMonthForExport(year,month)});
   return html;
 }
 
@@ -525,15 +560,15 @@ async function doExport(){
   const area=document.getElementById('export-area');
   container.style.opacity='1';container.style.zIndex='9999';container.style.pointerEvents='auto';
   area.innerHTML=buildExportContent();
-  await new Promise(r=>setTimeout(r,300));
+  await new Promise(r=>setTimeout(r,350));
   try{
     await html2pdf().set({
-      margin:[12,12,14,12],
-      filename:`proposta_permessi_${scopeLabel()}.pdf`,
+      margin:[10,10,12,10],
+      filename:'proposta_permessi.pdf',
       image:{type:'jpeg',quality:0.98},
       html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false},
       jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
-      pagebreak:{mode:['css','legacy']}
+      pagebreak:{mode:['css','legacy'],avoid:['.exp-month-block']}
     }).from(area).save();
     showToast('✓ PDF scaricato');
   }catch(e){
@@ -542,7 +577,6 @@ async function doExport(){
   }
   container.style.opacity='0.01';container.style.zIndex='-1';container.style.pointerEvents='none';
 }
-function scopeLabel(){return (settings.exportScope==='year'?currentYear:MONTHS[currentMonth]+'_'+currentYear)}
 
 function changeMonth(d){currentMonth+=d;if(currentMonth<0){currentMonth=11;currentYear--}if(currentMonth>11){currentMonth=0;currentYear++}render()}
 function openModal(id){document.getElementById(id).classList.add('show')}
