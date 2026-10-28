@@ -7,9 +7,8 @@
 <title>Gestione Ferie</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<!-- CDN CORRETTI: la versione 2.4.6 non esisteva, ecco perché l'export non funzionava -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
@@ -77,7 +76,6 @@ header h1{font-size:18px;font-weight:600}
 .op-item .days strong{color:var(--text)}
 .progress-bar{height:6px;background:var(--surface);border-radius:3px;overflow:hidden;margin-top:6px}
 .progress-bar .fill{height:100%;background:var(--text)}
-/* LISTA ASSENZE NEL GIORNO */
 .absence-item{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px}
 .absence-item .dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
 .absence-info{flex:1;min-width:0}
@@ -86,25 +84,42 @@ header h1{font-size:18px;font-weight:600}
 .absence-info .note{font-size:11px;margin-top:2px}
 .type-pill{display:inline-block;font-size:10px;padding:2px 6px;border-radius:4px;margin-top:4px}
 .empty-day{text-align:center;padding:24px;color:var(--muted);font-size:13px}
-/* EXPORT A LISTA */
-#export-area{display:none;position:fixed;left:-10000px;top:0;width:620px;background:#fff;color:#1a1a1a;padding:32px;font-family:inherit}
-.exp-title{font-size:24px;font-weight:700}
-.exp-sub{font-size:13px;color:#999;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #e5e5e5}
-.exp-month{font-size:16px;font-weight:700;text-transform:capitalize;margin:18px 0 10px;padding:8px 12px;background:#f5f5f5;border-radius:6px}
-.exp-row{display:flex;align-items:flex-start;gap:8px;padding:9px 4px;border-bottom:1px solid #eee;font-size:13px}
-.exp-row .dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex-shrink:0}
-.exp-row .who{font-weight:600;min-width:110px}
-.exp-row .when{flex:1}
-.exp-row .what{font-size:11px;padding:2px 6px;border-radius:4px;white-space:nowrap}
-.exp-empty{font-size:12px;color:#999;padding:10px 4px}
-.exp-summary{margin-top:24px;border-top:2px solid #e5e5e5;padding-top:14px}
-.exp-summary h3{font-size:14px;margin-bottom:8px}
-.exp-summary table{width:100%;border-collapse:collapse;font-size:12px}
-.exp-summary th,.exp-summary td{text-align:left;padding:7px;border-bottom:1px solid #eee}
-.exp-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;margin-top:16px;color:#666}
-.exp-legend .sw{width:12px;height:12px;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:4px}
 .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:12px 20px;border-radius:24px;font-size:13px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%;text-align:center}
 .toast.show{opacity:1}
+
+/* EXPORT: visible ma fuori dal viewport per html2canvas */
+#export-container{
+  position:absolute;
+  top:0;left:0;
+  width:100%;
+  pointer-events:none;
+  z-index:-1;
+  opacity:0.01;
+}
+#export-area{
+  width:595px; /* A4 portrait ~210mm at 72dpi */
+  margin:0 auto;
+  background:#fff;
+  color:#1a1a1a;
+  padding:40px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+}
+.exp-title{font-size:26px;font-weight:700;margin-bottom:4px}
+.exp-sub{font-size:14px;color:#999;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #e5e5e5}
+.exp-month{font-size:18px;font-weight:700;text-transform:capitalize;margin:24px 0 12px;padding:10px 14px;background:#f5f5f5;border-radius:8px}
+.exp-row{display:flex;align-items:center;gap:10px;padding:10px 6px;border-bottom:1px solid #eee;font-size:14px}
+.exp-row .dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.exp-row .who{font-weight:600;min-width:120px}
+.exp-row .when{flex:1}
+.exp-row .what{font-size:12px;padding:3px 8px;border-radius:4px;white-space:nowrap}
+.exp-empty{font-size:13px;color:#999;padding:12px 6px;font-style:italic}
+.exp-summary{margin-top:32px;border-top:2px solid #e5e5e5;padding-top:16px}
+.exp-summary h3{font-size:16px;margin-bottom:12px}
+.exp-summary table{width:100%;border-collapse:collapse;font-size:13px}
+.exp-summary th,.exp-summary td{text-align:left;padding:9px 6px;border-bottom:1px solid #eee}
+.exp-summary th{font-weight:600;background:#f9f9f9}
+.exp-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;margin-top:20px;color:#666}
+.exp-legend .sw{width:14px;height:14px;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:5px}
 </style>
 </head>
 <body>
@@ -139,12 +154,12 @@ header h1{font-size:18px;font-weight:600}
 
 <div class="bottom-bar">
   <button class="b" onclick="openModal('operatorsModal')"><i class="bi bi-people"></i>Operatori</button>
-  <button class="b" onclick="exportPDF()"><i class="bi bi-file-earmark-pdf"></i>PDF</button>
-  <button class="b" onclick="exportPNG()"><i class="bi bi-image"></i>PNG</button>
+  <button class="b" onclick="doExport('pdf')"><i class="bi bi-file-earmark-pdf"></i>PDF</button>
+  <button class="b" onclick="doExport('png')"><i class="bi bi-image"></i>PNG</button>
   <button class="b" onclick="openModal('settingsModal')"><i class="bi bi-sliders"></i>Setup</button>
 </div>
 
-<!-- GIORNO: elenco assenze + ANNULLA -->
+<!-- GIORNO -->
 <div class="modal-backdrop" id="dayModal">
   <div class="modal">
     <div class="modal-header">
@@ -231,7 +246,8 @@ header h1{font-size:18px;font-weight:600}
   </div>
 </div>
 
-<div id="export-area"></div>
+<!-- AREA EXPORT: rendering off-screen -->
+<div id="export-container"><div id="export-area"></div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -303,7 +319,6 @@ async function seed(){
   }catch(e){operators=seedLocal()}
 }
 
-/* FESTIVITÀ */
 function easter(y){
   const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25);
   const g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4;
@@ -320,7 +335,6 @@ function holidays(y){
   ].map(([date,name])=>({date,name}));
 }
 
-/* GIORNI RIMANENTI: conta solo Ferie, escluse domeniche e festività */
 function remaining(op){
   const year=parseInt(settings.refYear)||new Date().getFullYear();
   const hs=new Set(holidays(year).map(h=>h.date));
@@ -343,7 +357,6 @@ function onDay(dateStr){
   });
 }
 
-/* RENDER */
 function render(){
   document.getElementById('monthLabel').textContent=`${MONTHS[currentMonth]} ${currentYear}`;
   const bar=document.getElementById('operatorsBar');bar.innerHTML='';
@@ -399,7 +412,6 @@ function populateSelect(){
   document.getElementById('leaveOperator').innerHTML=operators.map(o=>`<option value="${o.id}">${esc(o.name)}</option>`).join('');
 }
 
-/* APRI GIORNO → ANNULLA */
 function openDayModal(ds){
   selectedDay=ds;
   document.getElementById('dayTitle').textContent='Assenze del '+itDate(ds);
@@ -422,7 +434,7 @@ function renderDayEntries(){
       </div>
       <button class="icon-btn danger" onclick="deleteLeave(${l.id})" title="Annulla assenza"><i class="bi bi-trash"></i></button>
     </div>`;
-  }).join('')+`<p style="font-size:11px;color:var(--muted);margin-top:10px"><i class="bi bi-info-circle"></i> Il cestino annulla tutta la serie di日期 dell'assenza (anche i giorni negli altri mesi).</p>`;
+  }).join('');
 }
 async function deleteLeave(id){
   const l=leaves.find(x=>x.id===id);if(!l)return;
@@ -440,7 +452,6 @@ async function deleteLeave(id){
 }
 function addFromDay(){closeModal('dayModal');openLeaveModal(selectedDay)}
 
-/* NUOVA ASSENZA */
 function openLeaveModal(ds=null){
   document.getElementById('leaveStart').value=ds||'';
   document.getElementById('leaveEnd').value=ds||'';
@@ -465,7 +476,6 @@ async function saveLeave(){
   render();
 }
 
-/* OPERATORI */
 async function addOperator(){
   const name=document.getElementById('newOpName').value.trim();
   if(!name){alert('Inserisci un nome');return}
@@ -488,7 +498,6 @@ async function deleteOperator(id){
   render();
 }
 
-/* SETTINGS */
 function editCompany(){openModal('settingsModal')}
 async function saveSettings(){
   settings.company=document.getElementById('companyName').value||'Gestione Ferie';
@@ -505,14 +514,13 @@ async function saveSettings(){
   closeModal('settingsModal');showToast('✓ Salvato');render();
 }
 async function resetLeaves(){
-  if(!confirm('Eliminare TUTTE le assenze? I giorni rimanenti torneranno disponibili.'))return;
+  if(!confirm('Eliminare TUTTE le assenze?'))return;
   try{await sb.from('leaves').delete().neq('id',0)}catch(e){}
   leaves=[];localStorage.setItem('leaves','[]');closeModal('settingsModal');render();showToast('✓ Assenze eliminate');
 }
 
-/* ============ EXPORT A LISTA ============ */
-function buildExport(){
-  const ea=document.getElementById('export-area');
+/* ============ EXPORT FUNZIONANTE ============ */
+function buildExportContent(){
   const scope=settings.exportScope||'month';
   const months=scope==='year'?[0,1,2,3,4,5,6,7,8,9,10,11]:[currentMonth];
   let html=`<div class="exp-title">${esc(settings.company)}</div>
@@ -552,41 +560,62 @@ function buildExport(){
   html+='</table></div><div class="exp-legend">';
   Object.keys(TYPES).forEach(t=>{html+=`<span><span class="sw" style="background:var(--${t})"></span>${TYPES[t]}</span>`});
   html+='</div>';
-  ea.innerHTML=html;ea.style.display='block';return ea;
+  return html;
 }
 
-async function exportPDF(){
-  if(typeof html2pdf==='undefined'){showToast('Libreria non caricata: controlla la connessione');return}
-  showToast('Generazione PDF…');
-  const el=buildExport();
+async function doExport(format){
+  showToast(format==='pdf'?'Generazione PDF…':'Generazione PNG…');
+  
+  const container=document.getElementById('export-container');
+  const area=document.getElementById('export-area');
+  
+  // Rendi visibile per il rendering
+  container.style.opacity='1';
+  container.style.zIndex='9999';
+  container.style.pointerEvents='auto';
+  area.innerHTML=buildExportContent();
+  
+  // Attendi il rendering
+  await new Promise(r=>setTimeout(r,300));
+  
   try{
-    await html2pdf().set({
-      margin:[10,10,12,10],
-      filename:`ferie_${scopeLabel()}.pdf`,
-      image:{type:'jpeg',quality:0.98},
-      html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},
-      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
-      pagebreak:{mode:['css','legacy']}
-    }).from(el).save();
-    showToast('✓ PDF scaricato');
-  }catch(e){showToast('Errore PDF: riprova')}
-  el.style.display='none';
+    if(format==='pdf'){
+      await html2pdf().set({
+        margin:[10,10,12,10],
+        filename:`ferie_${scopeLabel()}.pdf`,
+        image:{type:'jpeg',quality:0.98},
+        html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false},
+        jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+        pagebreak:{mode:['css','legacy']}
+      }).from(area).save();
+    }else{
+      const canvas=await html2canvas(area,{
+        scale:2,
+        useCORS:true,
+        backgroundColor:'#ffffff',
+        logging:false
+      });
+      const a=document.createElement('a');
+      a.download=`ferie_${scopeLabel()}.png`;
+      a.href=canvas.toDataURL('image/png');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+    showToast(format==='pdf'?'✓ PDF scaricato':'✓ PNG pronta per WhatsApp');
+  }catch(e){
+    console.error('Export error:',e);
+    showToast('Errore durante l\'export. Riprova.');
+  }
+  
+  // Nascondi di nuovo
+  container.style.opacity='0.01';
+  container.style.zIndex='-1';
+  container.style.pointerEvents='none';
 }
-async function exportPNG(){
-  if(typeof html2canvas==='undefined'){showToast('Libreria non caricata: controlla la connessione');return}
-  showToast('Generazione PNG…');
-  const el=buildExport();
-  try{
-    const canvas=await html2canvas(el,{scale:2,useCORS:true,backgroundColor:'#ffffff'});
-    const a=document.createElement('a');
-    a.download=`ferie_${scopeLabel()}.png`;a.href=canvas.toDataURL('image/png');a.click();
-    showToast('✓ PNG pronta per WhatsApp');
-  }catch(e){showToast('Errore PNG: riprova')}
-  el.style.display='none';
-}
+
 function scopeLabel(){return (settings.exportScope==='year'?currentYear:MONTHS[currentMonth]+'_'+currentYear)}
 
-/* UTIL */
 function changeMonth(d){currentMonth+=d;if(currentMonth<0){currentMonth=11;currentYear--}if(currentMonth>11){currentMonth=0;currentYear++}render()}
 function openModal(id){document.getElementById(id).classList.add('show')}
 function closeModal(id){document.getElementById(id).classList.remove('show')}
