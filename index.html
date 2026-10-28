@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#ffffff">
+<title>Gestione Ferie</title>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/2.4.6/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  :root {
+    --bg: #ffffff; --text: #1a1a1a; --muted: #999999;
+    --border: #e5e5e5; --surface: #f5f5f5;
+    --holiday: #F5D5C0; --sick: #F5C0C0; --permit: #C0D5F5;
+    --smart: #C0E5D0; --rest: #E0E0E0; --festive: #FFF3D6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.5; padding-bottom: 100px; overflow-x: hidden;
+  }
+  header {
+    position: sticky; top: 0; z-index: 50; background: var(--bg);
+    border-bottom: 1px solid var(--border); padding: 16px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .company-name { font-size: 11px; color: var(--muted); display: block; margin-top: 2px; font-weight: 400; }
+  .icon-btn {
+    background: none; border: none; font-size: 20px; color: var(--text);
+    cursor: pointer; padding: 8px; border-radius: 8px; transition: background 0.2s;
+  }
+  .icon-btn:hover, .icon-btn:active { background: var(--surface); }
+  .month-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+  }
+  .month-bar .month-label { font-size: 16px; font-weight: 600; text-transform: capitalize; min-width: 140px; text-align: center; }
+  .month-bar button { background: var(--surface); border: none; padding: 8px 12px; border-radius: 8px; font-size: 18px; cursor: pointer; }
+  .operators-bar {
+    display: flex; gap: 8px; padding: 12px 16px;
+    overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .operators-bar::-webkit-scrollbar { display: none; }
+  .operator-chip {
+    flex-shrink: 0; padding: 6px 12px; border-radius: 20px;
+    font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border); background: var(--bg); cursor: pointer; transition: all 0.2s;
+  }
+  .operator-chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .operator-chip .days-left { font-size: 10px; color: var(--muted); margin-left: 4px; }
+  .operator-chip.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .operator-chip.active .days-left { color: #ccc; }
+  .calendar-wrap { padding: 8px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .day-head { text-align: center; font-size: 10px; font-weight: 600; color: var(--muted); padding: 8px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+  .day-cell {
+    aspect-ratio: 1; border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px; display: flex; flex-direction: column; position: relative;
+    cursor: pointer; background: var(--bg); transition: all 0.15s; overflow: hidden; min-height: 60px;
+  }
+  .day-cell:active { transform: scale(0.96); }
+  .day-cell.other-month { opacity: 0.3; }
+  .day-cell.today { border-color: var(--text); border-width: 2px; }
+  .day-cell.festive { background: var(--festive); }
+  .day-num { font-size: 11px; font-weight: 600; }
+  .day-cell .festive-label { font-size: 8px; color: var(--muted); text-transform: uppercase; margin-top: 2px; line-height: 1; }
+  .leave-tags { display: flex; flex-wrap: wrap; gap: 2px; margin-top: auto; }
+  .leave-tag { font-size: 9px; padding: 2px 4px; border-radius: 4px; font-weight: 600; line-height: 1; }
+  .leave-tag.holiday { background: var(--holiday); }
+  .leave-tag.sick { background: var(--sick); }
+  .leave-tag.permit { background: var(--permit); }
+  .leave-tag.smart { background: var(--smart); }
+  .leave-tag.rest { background: var(--rest); }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-item .swatch { width: 12px; height: 12px; border-radius: 3px; }
+  .bottom-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg);
+    border-top: 1px solid var(--border); padding: 12px 16px;
+    display: flex; justify-content: space-around; z-index: 40;
+  }
+  .fab {
+    position: fixed; bottom: 85px; right: 16px; width: 56px; height: 56px;
+    border-radius: 50%; background: var(--text); color: var(--bg); border: none;
+    font-size: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); cursor: pointer; z-index: 45;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    display: none; align-items: flex-end; justify-content: center; z-index: 100;
+  }
+  .modal-backdrop.show { display: flex; }
+  .modal {
+    background: var(--bg); width: 100%; max-width: 500px;
+    border-radius: 20px 20px 0 0; max-height: 85vh; overflow-y: auto;
+    animation: slideUp 0.25s ease-out;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-header {
+    padding: 16px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; background: var(--bg); z-index: 1;
+  }
+  .modal-header h2 { font-size: 16px; font-weight: 600; }
+  .modal-body { padding: 16px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; color: var(--muted); }
+  .form-group input, .form-group select {
+    width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; font-family: inherit; background: var(--bg); color: var(--text);
+  }
+  .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--text); }
+  .btn-row { display: flex; gap: 8px; padding: 16px; border-top: 1px solid var(--border); }
+  .btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; }
+  .btn-primary { background: var(--text); color: var(--bg); }
+  .btn-secondary { background: var(--surface); color: var(--text); }
+  .op-item {
+    display: flex; align-items: center; gap: 10px; padding: 12px;
+    border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px;
+  }
+  .op-item .dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+  .op-item .info { flex: 1; }
+  .op-item .info .name { font-weight: 600; font-size: 14px; }
+  .op-item .info .days { font-size: 11px; color: var(--muted); margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .op-item .info .days span strong { color: var(--text); }
+  .op-item .del-btn { background: none; border: none; color: #999; font-size: 18px; cursor: pointer; padding: 4px; }
+  .progress-bar { height: 6px; background: var(--surface); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+  .progress-bar .fill { height: 100%; background: var(--text); border-radius: 3px; transition: width 0.3s; }
+
+  /* EXPORT AREA */
+  #export-area {
+    display: none; background: var(--bg); padding: 24px;
+    color: var(--text); font-family: inherit; width: 210mm;
+  }
+  #export-area .exp-title { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+  #export-area .exp-sub { font-size: 14px; color: var(--muted); margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid var(--border); }
+  #export-area .exp-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 24px; }
+  #export-area .exp-cal .h { text-align: center; font-size: 11px; font-weight: 700; padding: 8px 0; text-transform: uppercase; color: var(--muted); }
+  #export-area .exp-cal .c { min-height: 70px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 11px; }
+  #export-area .exp-cal .c.festive { background: var(--festive); }
+  #export-area .exp-cal .c.other { opacity: 0.3; }
+  #export-area .exp-cal .c .n { font-weight: 700; font-size: 13px; }
+  #export-area .exp-cal .c .fl { font-size: 8px; color: var(--muted); }
+  #export-area .exp-cal .c .t { font-size: 9px; padding: 2px 5px; border-radius: 3px; margin-top: 4px; display: inline-block; }
+  #export-area .exp-summary { border-top: 2px solid var(--border); padding-top: 16px; margin-bottom: 16px; }
+  #export-area .exp-summary h3 { font-size: 14px; margin-bottom: 10px; }
+  #export-area table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  #export-area table th, #export-area table td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); }
+  #export-area table th { font-weight: 600; }
+  #export-area .exp-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+  #export-area .exp-legend .sw { width: 14px; height: 14px; border-radius: 3px; display: inline-block; vertical-align: middle; margin-right: 4px; }
+
+  .toast {
+    position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: var(--bg); padding: 12px 20px;
+    border-radius: 24px; font-size: 13px; z-index: 200;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  .loading { text-align: center; padding: 40px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>📅 Gestione Ferie</h1>
+    <span class="company-name" id="companyDisplay" onclick="editCompany()">Tocca per cambiare nome attività</span>
+  </div>
+  <button class="icon-btn" onclick="openModal('settingsModal')"><i class="bi bi-gear"></i></button>
+</header>
+
+<div class="month-bar">
+  <button onclick="changeMonth(-1)"><i class="bi bi-chevron-left"></i></button>
+  <div class="month-label" id="monthLabel">—</div>
+  <button onclick="changeMonth(1)"><i class="bi bi-chevron-right"></i></button>
+</div>
+
+<div class="operators-bar" id="operatorsBar"></div>
+
+<div class="calendar-wrap">
+  <div class="cal-grid" id="calendar"></div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="swatch" style="background:var(--holiday)"></div>Ferie</div>
+  <div class="legend-item"><div class="swatch" style="background:var(--sick)"></div>Malattia</div>
+  <div class="legend-item"><div class="swatch" style="background:var(--permit)"></div>Permesso</div>
+  <div class="legend-item"><div class="swatch" style="background:var(--smart)"></div>Smart</div>
+  <div class="legend-item"><div class="swatch" style="background:var(--rest)"></div>Riposo</div>
+  <div class="legend-item"><div class="swatch" style="background:var(--festive);border:1px solid var(--border)"></div>Festivo</div>
+</div>
+
+<button class="fab" onclick="openLeaveModal()"><i class="bi bi-plus-lg"></i></button>
+
+<div class="bottom-bar">
+  <button class="icon-btn" onclick="openModal('operatorsModal')"><i class="bi bi-people"></i></button>
+  <button class="icon-btn" onclick="exportPDF()"><i class="bi bi-file-earmark-pdf"></i></button>
+  <button class="icon-btn" onclick="exportPNG()"><i class="bi bi-image"></i></button>
+  <button class="icon-btn" onclick="openModal('settingsModal')"><i class="bi bi-sliders"></i></button>
+</div>
+
+<!-- MODAL LEAVE -->
+<div class="modal-backdrop" id="leaveModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="leaveModalTitle">Nuova assenza</h2>
+      <button class="icon-btn" onclick="closeModal('leaveModal')"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Operatore</label><select id="leaveOperator"></select></div>
+      <div class="form-group"><label>Data inizio</label><input type="date" id="leaveStart"></div>
+      <div class="form-group"><label>Data fine</label><input type="date" id="leaveEnd"></div>
+      <div class="form-group"><label>Tipo</label>
+        <select id="leaveType">
+          <option value="holiday">Ferie</option>
+          <option value="sick">Malattia</option>
+          <option value="permit">Permesso</option>
+          <option value="smart">Smart working</option>
+          <option value="rest">Riposo / turno</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Note (opzionale)</label><input type="text" id="leaveNote" placeholder="Es. Ferie estive"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="closeModal('leaveModal')">Annulla</button>
+      <button class="btn btn-primary" onclick="saveLeave()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL OPERATORS -->
+<div class="modal-backdrop" id="operatorsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Operatori</h2>
+      <button class="icon-btn" onclick="closeModal('operatorsModal')"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="modal-body">
+      <div id="operatorsList"></div>
+      <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
+      <h3 style="font-size:14px;margin-bottom:12px">Aggiungi nuovo operatore</h3>
+      <div class="form-group"><label>Nome e cognome</label><input type="text" id="newOpName" placeholder="Es. Mario Rossi"></div>
+      <div class="form-group"><label>Colore identificativo</label><input type="color" id="newOpColor" value="#F5D5C0"></div>
+      <div class="form-group"><label>Giorni totali di ferie all'anno</label><input type="number" id="newOpTotal" value="26" min="0"></div>
+      <div class="form-group"><label>Giorni già usati (storico)</label><input type="number" id="newOpUsed" value="0" min="0"></div>
+      <button class="btn btn-primary" style="width:100%" onclick="addOperator()">+ Aggiungi operatore</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SETTINGS -->
+<div class="modal-backdrop" id="settingsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Impostazioni</h2>
+      <button class="icon-btn" onclick="closeModal('settingsModal')"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Nome attività / azienda</label><input type="text" id="companyName" placeholder="Es. Studio Martorana"></div>
+      <div class="form-group"><label>Anno di riferimento per il calcolo ferie</label><input type="number" id="refYear" value="2026" min="2000" max="2100"></div>
+      <button class="btn btn-primary" style="width:100%" onclick="saveSettings()">Salva impostazioni</button>
+      <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
+      <button class="btn btn-secondary" style="width:100%;background:#f5c0c0;color:#8b0000" onclick="resetData()">⚠️ Reset tutti i dati</button>
+    </div>
+  </div>
+</div>
+
+<div id="export-area"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ CONFIG SUPABASE ============ */
+const SUPABASE_URL = 'https://rdabrgtlqpbqjvsfggre.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_KV0Avg1vu9F1Q-FuHQ3aRQ_jJs9h0Np';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ============ STATE ============ */
+let operators = [];
+let leaves = [];
+let settings = { company: 'Tocca per cambiare nome attività', refYear: new Date().getFullYear() };
+let currentYear = new Date().getFullYear();
+let currentMonth = new Date().getMonth();
+let activeFilter = null;
+
+const MONTHS_IT = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+const DAYS_IT = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+const TYPE_LABELS = { holiday:'Ferie', sick:'Malattia', permit:'Permesso', smart:'Smart', rest:'Riposo' };
+const TYPE_COUNTS = { holiday:'count_holiday', sick:'count_sick', permit:'count_permit', smart:'count_smart', rest:'count_rest' };
+
+/* ============ INIT ============ */
+async function init() {
+  showToast('Caricamento...');
+  await loadSettings();
+  await loadOperators();
+  await loadLeaves();
+  render();
+  hideToast();
+}
+
+async function loadOperators() {
+  try {
+    const { data, error } = await sb.from('operators').select('*').order('name');
+    if (error) throw error;
+    operators = data || [];
+    if (operators.length === 0) await seedOperators();
+  } catch (e) {
+    console.warn('Supabase non raggiungibile, uso localStorage');
+    const stored = localStorage.getItem('operators');
+    operators = stored ? JSON.parse(stored) : getDefaultOperators();
+  }
+}
+
+async function loadLeaves() {
+  try {
+    const { data, error } = await sb.from('leaves').select('*');
+    if (error) throw error;
+    leaves = data || [];
+  } catch (e) {
+    const stored = localStorage.getItem('leaves');
+    leaves = stored ? JSON.parse(stored) : [];
+  }
+}
+
+async function loadSettings() {
+  try {
+    const { data } = await sb.from('settings').select('*');
+    if (data && data.length) data.forEach(r => { settings[r.key] = r.value; });
+  } catch (e) {
+    const stored = localStorage.getItem('settings');
+    if (stored) settings = { ...settings, ...JSON.parse(stored) };
+  }
+  document.getElementById('companyDisplay').textContent = settings.company || 'Tocca per cambiare nome attività';
+  document.getElementById('companyName').value = settings.company || '';
+  document.getElementById('refYear').value = settings.refYear || new Date().getFullYear();
+}
+
+/* ============ SEED ============ */
+const defaultOperators = [
+  { name: 'Martorana', color: '#F5D5C0', total_days: 26, used_days: 0, is_active: true, count_holiday: 0, count_sick: 0, count_permit: 0, count_smart: 0, count_rest: 0 },
+  { name: 'Plano', color: '#C0D5F5', total_days: 26, used_days: 0, is_active: true, count_holiday: 0, count_sick: 0, count_permit: 0, count_smart: 0, count_rest: 0 },
+  { name: 'Corradengo', color: '#C0E5D0', total_days: 26, used_days: 0, is_active: true, count_holiday: 0, count_sick: 0, count_permit: 0, count_smart: 0, count_rest: 0 },
+  { name: 'Donzelli', color: '#F5C0C0', total_days: 26, used_days: 0, is_active: true, count_holiday: 0, count_sick: 0, count_permit: 0, count_smart: 0, count_rest: 0 },
+];
+
+function getDefaultOperators() { return defaultOperators.map((o, i) => ({ id: i + 1, ...o })); }
+
+async function seedOperators() {
+  try {
+    const { data, error } = await sb.from('operators').insert(defaultOperators).select();
+    operators = data || getDefaultOperators();
+  } catch (e) {
+    operators = getDefaultOperators();
+    localStorage.setItem('operators', JSON.stringify(operators));
+  }
+}
+
+/* ============ FESTIVITÀ ============ */
+function getEaster(year) {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function getHolidays(year) {
+  const easter = getEaster(year);
+  const easterMonday = new Date(easter);
+  easterMonday.setDate(easter.getDate() + 1);
+  return [
+    { date: `${year}-01-01`, name: 'Capodanno' },
+    { date: `${year}-01-06`, name: 'Epifania' },
+    { date: fmtDate(easter), name: 'Pasqua' },
+    { date: fmtDate(easterMonday), name: 'Pasquetta' },
+    { date: `${year}-04-25`, name: 'Liberazione' },
+    { date: `${year}-05-01`, name: 'Festa lavoro' },
+    { date: `${year}-06-02`, name: 'Repubblica' },
+    { date: `${year}-08-15`, name: 'Ferragosto' },
+    { date: `${year}-11-01`, name: 'Ognissanti' },
+    { date: `${year}-12-08`, name: 'Immacolata' },
+    { date: `${year}-12-25`, name: 'Natale' },
+    { date: `${year}-12-26`, name: 'S. Stefano' },
+  ];
+}
+
+function fmtDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function parseDate(s) {
+  const [y,m,d] = s.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+
+/* ============ RENDER ============ */
+function render() {
+  renderMonthLabel();
+  renderOperatorChips();
+  renderCalendar();
+  renderOperatorList();
+  populateOperatorSelect();
+}
+
+function renderMonthLabel() {
+  document.getElementById('monthLabel').textContent = `${MONTHS_IT[currentMonth]} ${currentYear}`;
+}
+
+function renderOperatorChips() {
+  const bar = document.getElementById('operatorsBar');
+  bar.innerHTML = '';
+  operators.forEach(op => {
+    const remaining = calcRemaining(op);
+    const chip = document.createElement('div');
+    chip.className = 'operator-chip' + (activeFilter === op.id ? ' active' : '');
+    chip.innerHTML = `
+      <div class="dot" style="background:${op.color}"></div>
+      <span>${op.name}</span>
+      <span class="days-left">${remaining}g</span>
+    `;
+    chip.onclick = () => { activeFilter = activeFilter === op.id ? null : op.id; renderCalendar(); renderOperatorChips(); };
+    bar.appendChild(chip);
+  });
+}
+
+function calcRemaining(op) {
+  // Conta solo giorni di ferie nell'anno di riferimento
+  const year = parseInt(settings.refYear) || new Date().getFullYear();
+  let used = parseInt(op.used_days) || 0;
+  leaves.forEach(l => {
+    if (l.operator_id !== op.id || l.type !== 'holiday') return;
+    const start = parseDate(l.start_date);
+    const end = parseDate(l.end_date);
+    if (start.getFullYear() !== year && end.getFullYear() !== year) return;
+    let d = new Date(start);
+    while (d <= end) {
+      if (d.getFullYear() === year) {
+        const dow = d.getDay();
+        if (dow !== 0 && dow !== 6) used++; // esclude weekend
+      }
+      d.setDate(d.getDate() + 1);
+    }
+  });
+  return Math.max(0, (parseInt(op.total_days) || 0) - used);
+}
+
+function renderCalendar() {
+  const cal = document.getElementById('calendar');
+  cal.innerHTML = '';
+  DAYS_IT.forEach(d => {
+    const h = document.createElement('div');
+    h.className = 'day-head';
+    h.textContent = d;
+    cal.appendChild(h);
+  });
+  const firstDay = new Date(currentYear, currentMonth, 1);
+  const lastDay = new Date(currentYear, currentMonth + 1, 0);
+  let startOffset = firstDay.getDay();
+  startOffset = startOffset === 0 ? 6 : startOffset - 1;
+  const holidays = getHolidays(currentYear);
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  for (let i = startOffset; i > 0; i--) {
+    const d = new Date(currentYear, currentMonth, 1 - i);
+    cal.appendChild(createDayCell(d, true, holidays, today));
+  }
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const date = new Date(currentYear, currentMonth, d);
+    cal.appendChild(createDayCell(date, false, holidays, today));
+  }
+  const totalCells = startOffset + lastDay.getDate();
+  const remaining = (7 - (totalCells % 7)) % 7;
+  for (let i = 1; i <= remaining; i++) {
+    const d = new Date(currentYear, currentMonth + 1, i);
+    cal.appendChild(createDayCell(d, true, holidays, today));
+  }
+}
+
+function createDayCell(date, otherMonth, holidays, today) {
+  const cell = document.createElement('div');
+  cell.className = 'day-cell';
+  if (otherMonth) cell.classList.add('other-month');
+  if (date.getTime() === today.getTime()) cell.classList.add('today');
+  const dateStr = fmtDate(date);
+  const holiday = holidays.find(h => h.date === dateStr);
+  if (holiday) cell.classList.add('festive');
+  const num = document.createElement('div');
+  num.className = 'day-num';
+  num.textContent = date.getDate();
+  cell.appendChild(num);
+  if (holiday) {
+    const lbl = document.createElement('div');
+    lbl.className = 'festive-label';
+    lbl.textContent = holiday.name;
+    cell.appendChild(lbl);
+  }
+  const tags = document.createElement('div');
+  tags.className = 'leave-tags';
+  const dayLeaves = leaves.filter(l => {
+    if (activeFilter && l.operator_id !== activeFilter) return false;
+    const s = parseDate(l.start_date), e = parseDate(l.end_date);
+    return date >= s && date <= e;
+  });
+  dayLeaves.forEach(l => {
+    const op = operators.find(o => o.id === l.operator_id);
+    if (!op) return;
+    const t = document.createElement('div');
+    t.className = `leave-tag ${l.type}`;
+    t.textContent = op.name.substring(0, 6);
+    t.title = `${op.name} - ${TYPE_LABELS[l.type]}`;
+    tags.appendChild(t);
+  });
+  cell.appendChild(tags);
+  cell.onclick = () => openLeaveModal(dateStr);
+  return cell;
+}
+
+/* ============ NAVIGATION ============ */
+function changeMonth(delta) {
+  currentMonth += delta;
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  else if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  render();
+}
+
+/* ============ LEAVES ============ */
+function populateOperatorSelect() {
+  const sel = document.getElementById('leaveOperator');
+  sel.innerHTML = operators.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+}
+
+function openLeaveModal(dateStr = null) {
+  document.getElementById('leaveModalTitle').textContent = dateStr ? `Assenza del ${formatDateIT(dateStr)}` : 'Nuova assenza';
+  const start = document.getElementById('leaveStart');
+  const end = document.getElementById('leaveEnd');
+  if (dateStr) { start.value = dateStr; end.value = dateStr; }
+  else { start.value = ''; end.value = ''; }
+  document.getElementById('leaveNote').value = '';
+  openModal('leaveModal');
+}
+
+function formatDateIT(s) {
+  if (!s) return '';
+  const [y,m,d] = s.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+async function saveLeave() {
+  const operator_id = parseInt(document.getElementById('leaveOperator').value);
+  const start_date = document.getElementById('leaveStart').value;
+  const end_date = document.getElementById('leaveEnd').value;
+  const type = document.getElementById('leaveType').value;
+  const note = document.getElementById('leaveNote').value;
+  if (!operator_id || !start_date || !end_date) { alert('Compila tutti i campi obbligatori'); return; }
+  if (parseDate(end_date) < parseDate(start_date)) { alert('La data fine deve essere >= data inizio'); return; }
+  const record = { operator_id, start_date, end_date, type, note };
+  try {
+    const { data, error } = await sb.from('leaves').insert(record).select();
+    if (error) throw error;
+    leaves = leaves.concat(data);
+  } catch (e) {
+    record.id = Date.now();
+    leaves.push(record);
+    localStorage.setItem('leaves', JSON.stringify(leaves));
+  }
+  closeModal('leaveModal');
+  showToast('✓ Assenza salvata');
+  render();
+}
+
+/* ============ OPERATORS ============ */
+function renderOperatorList() {
+  const list = document.getElementById('operatorsList');
+  list.innerHTML = operators.map(op => {
+    const remaining = calcRemaining(op);
+    const used = (parseInt(op.total_days) || 0) - remaining;
+    const pct = Math.min(100, Math.round((used / (parseInt(op.total_days) || 1)) * 100));
+    return `
+      <div class="op-item">
+        <div class="dot" style="background:${op.color}"></div>
+        <div class="info">
+          <div class="name">${op.name}</div>
+          <div class="days">
+            <span>Totale: <strong>${op.total_days}g</strong></span>
+            <span>Usati: <strong>${used}g</strong></span>
+            <span>Rimanenti: <strong>${remaining}g</strong></span>
+          </div>
+          <div class="progress-bar"><div class="fill" style="width:${pct}%"></div></div>
+        </div>
+        <button class="del-btn" onclick="deleteOperator(${op.id})"><i class="bi bi-trash"></i></button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function addOperator() {
+  const name = document.getElementById('newOpName').value.trim();
+  const color = document.getElementById('newOpColor').value;
+  const total_days = parseInt(document.getElementById('newOpTotal').value) || 26;
+  const used_days = parseInt(document.getElementById('newOpUsed').value) || 0;
+  if (!name) { alert('Inserisci il nome'); return; }
+  const record = { name, color, total_days, used_days, is_active: true };
+  try {
+    const { data, error } = await sb.from('operators').insert(record).select();
+    if (error) throw error;
+    operators.push(data[0]);
+  } catch (e) {
+    record.id = Date.now();
+    operators.push(record);
+    localStorage.setItem('operators', JSON.stringify(operators));
+  }
+  document.getElementById('newOpName').value = '';
+  document.getElementById('newOpUsed').value = '0';
+  showToast(`✓ ${name} aggiunto`);
+  render();
+}
+
+async function deleteOperator(id) {
+  if (!confirm('Eliminare questo operatore e tutte le sue assenze?')) return;
+  try { await sb.from('operators').delete().eq('id', id); await sb.from('leaves').delete().eq('operator_id', id); } catch (e) {}
+  operators = operators.filter(o => o.id !== id);
+  leaves = leaves.filter(l => l.operator_id !== id);
+  localStorage.setItem('operators', JSON.stringify(operators));
+  localStorage.setItem('leaves', JSON.stringify(leaves));
+  showToast('Operatore eliminato');
+  render();
+}
+
+/* ============ SETTINGS ============ */
+function editCompany() {
+  openModal('settingsModal');
+  setTimeout(() => document.getElementById('companyName').focus(), 300);
+}
+
+async function saveSettings() {
+  settings.company = document.getElementById('companyName').value || 'Tocca per cambiare nome attività';
+  settings.refYear = parseInt(document.getElementById('refYear').value) || new Date().getFullYear();
+  try {
+    await sb.from('settings').upsert([
+      { key: 'company', value: settings.company },
+      { key: 'refYear', value: settings.refYear }
+    ]);
+  } catch (e) {
+    localStorage.setItem('settings', JSON.stringify(settings));
+  }
+  document.getElementById('companyDisplay').textContent = settings.company;
+  closeModal('settingsModal');
+  showToast('✓ Impostazioni salvate');
+  render();
+}
+
+async function resetData() {
+  if (!confirm('Sei sicuro? Tutti i dati verranno eliminati.')) return;
+  try { await sb.from('leaves').delete().neq('id', 0); } catch (e) {}
+  leaves = [];
+  localStorage.removeItem('leaves');
+  showToast('✓ Dati resettati');
+  render();
+}
+
+/* ============ EXPORT ============ */
+function buildExportHTML() {
+  const ea = document.getElementById('export-area');
+  ea.style.display = 'block';
+  const holidays = getHolidays(currentYear);
+  const monthName = `${MONTHS_IT[currentMonth]} ${currentYear}`;
+  let calHTML = DAYS_IT.map(d => `<div class="h">${d}</div>`).join('');
+  const firstDay = new Date(currentYear, currentMonth, 1);
+  const lastDay = new Date(currentYear, currentMonth + 1, 0);
+  let offset = firstDay.getDay();
+  offset = offset === 0 ? 6 : offset - 1;
+  for (let i = offset; i > 0; i--) calHTML += `<div class="c other"><div class="n">${new Date(currentYear, currentMonth, 1 - i).getDate()}</div></div>`;
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const date = new Date(currentYear, currentMonth, d);
+    const dateStr = fmtDate(date);
+    const holiday = holidays.find(h => h.date === dateStr);
+    const dayLeaves = leaves.filter(l => {
+      const s = parseDate(l.start_date), e = parseDate(l.end_date);
+      return date >= s && date <= e;
+    });
+    let tags = dayLeaves.map(l => {
+      const op = operators.find(o => o.id === l.operator_id);
+      return op ? `<div class="t" style="background:${op.color}">${op.name.substring(0,8)} ${TYPE_LABELS[l.type]}</div>` : '';
+    }).join('');
+    calHTML += `<div class="c ${holiday?'festive':''}"><div class="n">${d}</div>${holiday?`<div class="fl">${holiday.name}</div>`:''}${tags}</div>`;
+  }
+  const totalCells = offset + lastDay.getDate();
+  const rem = (7 - (totalCells % 7)) % 7;
+  for (let i = 1; i <= rem; i++) calHTML += `<div class="c other"><div class="n">${i}</div></div>`;
+
+  let summaryRows = operators.map(op => {
+    const rem = calcRemaining(op);
+    const used = (parseInt(op.total_days) || 0) - rem;
+    return `<tr><td><div style="display:flex;align-items:center;gap:6px"><div style="width:12px;height:12px;border-radius:50%;background:${op.color}"></div>${op.name}</div></td><td>${op.total_days}</td><td>${used}</td><td><strong>${rem}</strong></td></tr>`;
+  }).join('');
+
+  ea.innerHTML = `
+    <div class="exp-title">${settings.company}</div>
+    <div class="exp-sub">Calendario ferie — ${monthName}</div>
+    <div class="exp-cal">${calHTML}</div>
+    <div class="exp-summary">
+      <h3>Riepilogo giorni rimanenti</h3>
+      <table>
+        <thead><tr><th>Operatore</th><th>Totale</th><th>Usati</th><th>Rimanenti</th></tr></thead>
+        <tbody>${summaryRows}</tbody>
+      </table>
+    </div>
+    <div class="exp-legend">
+      <div><span class="sw" style="background:var(--holiday)"></span>Ferie</div>
+      <div><span class="sw" style="background:var(--sick)"></span>Malattia</div>
+      <div><span class="sw" style="background:var(--permit)"></span>Permesso</div>
+      <div><span class="sw" style="background:var(--smart)"></span>Smart</div>
+      <div><span class="sw" style="background:var(--rest)"></span>Riposo</div>
+      <div><span class="sw" style="background:var(--festive);border:1px solid #ccc"></span>Festivo</div>
+    </div>
+  `;
+  return ea;
+}
+
+async function exportPDF() {
+  const el = buildExportHTML();
+  showToast('⏳ Generazione PDF...');
+  const opt = {
+    margin: 10,
+    filename: `ferie_${MONTHS_IT[currentMonth]}_${currentYear}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+  };
+  try {
+    await html2pdf().set(opt).from(el).save();
+    showToast('✓ PDF scaricato');
+  } catch (e) {
+    showToast('❌ Errore export');
+  }
+  el.style.display = 'none';
+}
+
+async function exportPNG() {
+  const el = buildExportHTML();
+  showToast('⏳ Generazione PNG...');
+  try {
+    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    const link = document.createElement('a');
+    link.download = `ferie_${MONTHS_IT[currentMonth]}_${currentYear}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('✓ PNG scaricata (pronta per WhatsApp)');
+  } catch (e) {
+    showToast('❌ Errore export');
+  }
+  el.style.display = 'none';
+}
+
+/* ============ MODAL & UTILS ============ */
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  if (msg !== 'Caricamento...') setTimeout(hideToast, 2500);
+}
+function hideToast() { document.getElementById('toast').classList.remove('show'); }
+
+document.querySelectorAll('.modal-backdrop').forEach(b => {
+  b.addEventListener('click', (e) => { if (e.target === b) b.classList.remove('show'); });
+});
+
+init();
+</script>
+
+</body>
+</html>
