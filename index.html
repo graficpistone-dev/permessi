@@ -493,7 +493,7 @@ async function resetLeaves(){
   leaves=[];localStorage.setItem('leaves','[]');closeModal('settingsModal');render();showToast('✓ Assenze eliminate');
 }
 
-/* ============ EXPORT MINIMALE: Proposta permessi ============ */
+/* ============ EXPORT: date formato "9 Novembre 2026" ============ */
 function buildExportContent(){
   const scope=settings.exportScope||'month';
   const months=scope==='year'?[0,1,2,3,4,5,6,7,8,9,10,11]:[currentMonth];
@@ -508,7 +508,7 @@ function buildExportContent(){
       for(let d=1;d<=daysIn;d++){
         const ds=fmt(new Date(currentYear,m,d));
         const hit=leaves.some(l=>l.operator_id===op.id && parse(ds)>=parse(l.start_date) && parse(ds)<=parse(l.end_date));
-        if(hit)days.push(d);
+        if(hit)days.push(`${d} ${MONTHS[m]} ${currentYear}`);
       }
       if(days.length){
         rows+=`<div class="exp-row"><span class="who">${esc(op.name)}</span><span class="when">— ${days.join(', ')}</span></div>`;
